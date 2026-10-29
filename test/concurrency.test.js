@@ -10,21 +10,18 @@ describe("Critical Concurrency Safety", () => {
   });
 
   it("handles 20 parallel requests with a 10-credit wallet: exactly 10 succeed, balance never negative", async () => {
-    // 1. Create a reliable provider with ample balance
     const provider = await createTestProvider({
       priority: 999,
       balance: "500.00",
       failureRate: "0.00",
     });
 
-    // 2. Create an isolated user with exactly 10.00 credits
     const { user, cleanup: cleanupUser } = await createTestUser({
       name: "Concurrency Tester",
       balance: "10.00",
     });
 
     try {
-      // 3. Fire 20 parallel requests simultaneously
       const parallelRequests = Array.from({ length: 20 }, (_, index) => {
         const recipient = `984100${String(index).padStart(4, "0")}`;
         return sendSms({
@@ -45,7 +42,6 @@ describe("Critical Concurrency Safety", () => {
         (o) => o.status === "rejected" && o.err?.statusCode === 402
       );
 
-      // 4. Assertions: exactly 10 succeed, exactly 10 rejected with 402 Insufficient credits
       assert.equal(
         succeeded.length,
         10,
@@ -57,7 +53,6 @@ describe("Critical Concurrency Safety", () => {
         `Expected exactly 10 rejected requests (402), but got ${rejectedForCredits.length}`
       );
 
-      // 5. Final wallet balance check: must be exactly 0.00 and NEVER negative
       const finalWallet = await prisma.credit_wallets.findUnique({
         where: { user_id: user.id },
       });
@@ -72,8 +67,6 @@ describe("Critical Concurrency Safety", () => {
         finalBalance >= 0,
         "Wallet balance must never be negative under concurrency"
       );
-
-      // 6. Verify exactly 10 SMS logs were persisted in database
       const totalLogsCreated = await prisma.sms_logs.count({
         where: { user_id: user.id },
       });

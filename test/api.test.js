@@ -12,7 +12,6 @@ describe("API Endpoints & Integration", () => {
   let registeredEmail;
 
   before(async () => {
-    // Start Express server on random available port
     await new Promise((resolve) => {
       server = app.listen(0, () => {
         const port = server.address().port;
@@ -21,7 +20,6 @@ describe("API Endpoints & Integration", () => {
       });
     });
 
-    // Create a provider for API send tests
     testProvider = await createTestProvider({
       priority: 850,
       balance: "500.00",
@@ -155,7 +153,6 @@ describe("API Endpoints & Integration", () => {
   });
 
   it("POST /sms/send deducts credits and sends SMS when user has credits", async () => {
-    // Add 5.00 credits to user wallet
     const user = await prisma.users.findUnique({ where: { email: registeredEmail } });
     await prisma.credit_wallets.update({
       where: { user_id: user.id },

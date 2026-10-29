@@ -35,7 +35,6 @@ export async function createTestUser({
     user,
     token,
     cleanup: async () => {
-      // Clean up logs, attempts, wallets, and user
       await prisma.sms_provider_attempts.deleteMany({
         where: { sms_logs: { user_id: user.id } },
       });

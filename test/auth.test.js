@@ -9,7 +9,6 @@ describe("Authentication & JWT Middleware", () => {
   const createdUserIds = [];
 
   after(async () => {
-    // Clean up created test users
     for (const userId of createdUserIds) {
       await prisma.credit_wallets.deleteMany({ where: { user_id: userId } });
       await prisma.users.delete({ where: { id: userId } }).catch(() => {});
@@ -31,7 +30,6 @@ describe("Authentication & JWT Middleware", () => {
     assert.equal(result.user.email, email);
     assert.ok(result.token);
 
-    // Verify wallet was created in the database
     const wallet = await prisma.credit_wallets.findUnique({
       where: { user_id: BigInt(result.user.id) },
     });

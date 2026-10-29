@@ -82,15 +82,6 @@ export function verifyWebhookSignature({
   return { timestamp, signature: expected };
 }
 
-/**
- * Process a signed delivery report for one of our sent SMS logs.
- *
- * Contract:
- *   POST /webhooks/sms/delivery
- *   Headers: x-sms-signature: sha256=<hmac>, x-sms-timestamp: <unix seconds>
- *   Body: { messageId, provider, status: "delivered"|"failed",
- *           providerMessageId?, error? }
- */
 export async function processDeliveryReport({ headers, rawBody, payload }) {
   const { timestamp } = verifyWebhookSignature({ headers, rawBody });
 

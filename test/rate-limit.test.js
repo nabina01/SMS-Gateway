@@ -63,7 +63,6 @@ describe("Per-user rate limiting", () => {
     assert.equal((await limiter.check("user:1")).allowed, true);
     assert.equal((await limiter.check("user:1")).allowed, true);
     assert.equal((await limiter.check("user:1")).allowed, false);
-    // A different user has an independent bucket.
     assert.equal((await limiter.check("user:2")).allowed, true);
 
     now += 61_000;

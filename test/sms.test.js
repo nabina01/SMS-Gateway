@@ -37,13 +37,11 @@ describe("SMS Service & Routing", () => {
   });
 
   it("routes through priority order, fails over on failure, and debits winning provider", async () => {
-    // Provider 1: high priority (901), 100% failure rate
     const p1 = await createTestProvider({
       priority: 901,
       balance: "50.00",
       failureRate: "1.00",
     });
-    // Provider 2: lower priority (902), 0% failure rate (reliable)
     const p2 = await createTestProvider({
       priority: 902,
       balance: "50.00",
@@ -63,33 +61,28 @@ describe("SMS Service & Routing", () => {
       assert.equal(sendResult.results[0].status, "sent");
       assert.equal(sendResult.results[0].provider.id, p2.provider.id.toString());
 
-      // Verify Provider 1 was attempted and failed
       const p1Attempts = await prisma.sms_provider_attempts.findMany({
         where: { provider_id: p1.provider.id },
       });
       assert.equal(p1Attempts.length, 1);
       assert.equal(p1Attempts[0].status, "failed");
 
-      // Verify Provider 1 balance was NOT deducted
       const p1Fresh = await prisma.sms_providers.findUnique({
         where: { id: p1.provider.id },
       });
       assert.equal(Number(p1Fresh.balance), 50.0);
 
-      // Verify Provider 2 was attempted and sent
       const p2Attempts = await prisma.sms_provider_attempts.findMany({
         where: { provider_id: p2.provider.id },
       });
       assert.equal(p2Attempts.length, 1);
       assert.equal(p2Attempts[0].status, "sent");
 
-      // Verify Provider 2 balance WAS deducted by 1.00 credit
       const p2Fresh = await prisma.sms_providers.findUnique({
         where: { id: p2.provider.id },
       });
       assert.equal(Number(p2Fresh.balance), 49.0);
 
-      // Verify user wallet balance was deducted (10.00 - 1.00 = 9.00)
       const freshWallet = await prisma.credit_wallets.findUnique({
         where: { user_id: user.id },
       });
@@ -102,7 +95,6 @@ describe("SMS Service & Routing", () => {
   });
 
   it("refunds credits when all available providers fail", async () => {
-    // Only Provider: 100% failure rate
     const pFail = await createTestProvider({
       priority: 910,
       balance: "50.00",
@@ -111,7 +103,6 @@ describe("SMS Service & Routing", () => {
     const { user, cleanup: cleanupUser } = await createTestUser({ balance: "5.00" });
 
     try {
-      // Pass options.simulatedFailure = true to ensure deterministic failure across all providers
       const sendResult = await sendSms({
         userId: user.id,
         to: ["9841234567"],
@@ -124,13 +115,11 @@ describe("SMS Service & Routing", () => {
       assert.equal(sendResult.totalRefunded, "1.00");
       assert.equal(sendResult.results[0].status, "failed");
 
-      // Verify user wallet was fully refunded back to 5.00
       const wallet = await prisma.credit_wallets.findUnique({
         where: { user_id: user.id },
       });
       assert.equal(Number(wallet.balance), 5.0);
 
-      // Verify SMS log is marked as failed
       const log = await prisma.sms_logs.findFirst({
         where: { user_id: user.id },
       });
@@ -143,7 +132,6 @@ describe("SMS Service & Routing", () => {
   });
 
   it("refunds only failed recipients in multi-recipient request", async () => {
-    // Provider has balance for exactly 1 SMS (1.00)
     const pLimited = await createTestProvider({
       priority: 915,
       balance: "1.00",
@@ -313,12 +301,10 @@ describe("SMS Service & Routing", () => {
     const { user, cleanup: cleanupUser } = await createTestUser({ balance: "10.00" });
 
     try {
-      // Send 3 SMS messages
       await sendSms({ userId: user.id, to: ["9841000001"], message: "Msg 1" });
       await sendSms({ userId: user.id, to: ["9841000002"], message: "Msg 2" });
       await sendSms({ userId: user.id, to: ["9841000003"], message: "Msg 3" });
 
-      // Test pagination: page 1 with limit 2
       const page1 = await getSmsLogs({ userId: user.id, page: 1, limit: 2 });
       assert.equal(page1.logs.length, 2);
       assert.equal(page1.pagination.totalCount, 3);
@@ -326,13 +312,11 @@ describe("SMS Service & Routing", () => {
       assert.equal(page1.pagination.hasNextPage, true);
       assert.equal(page1.pagination.hasPrevPage, false);
 
-      // Page 2 with limit 2
       const page2 = await getSmsLogs({ userId: user.id, page: 2, limit: 2 });
       assert.equal(page2.logs.length, 1);
       assert.equal(page2.pagination.hasNextPage, false);
       assert.equal(page2.pagination.hasPrevPage, true);
 
-      // Filter by recipient
       const recipientFiltered = await getSmsLogs({
         userId: user.id,
         recipient: "9841000002",
@@ -340,14 +324,12 @@ describe("SMS Service & Routing", () => {
       assert.equal(recipientFiltered.logs.length, 1);
       assert.equal(recipientFiltered.logs[0].recipient, "9841000002");
 
-      // Filter by status 'sent'
       const statusFiltered = await getSmsLogs({
         userId: user.id,
         status: "sent",
       });
       assert.equal(statusFiltered.logs.length, 3);
 
-      // Inclusive same-day range + normalized recipient filter
       const today = new Date().toISOString().slice(0, 10);
       const dateFiltered = await getSmsLogs({
         userId: user.id,
@@ -412,23 +394,17 @@ describe("SMS Service & Routing", () => {
     const userB = await createTestUser({ name: "User B", balance: "5.00" });
 
     try {
-      // User A sends 1 SMS
       await sendSms({ userId: userA.user.id, to: ["9841111111"], message: "From User A" });
-
-      // User B sends 1 SMS
       await sendSms({ userId: userB.user.id, to: ["9842222222"], message: "From User B" });
 
-      // User A queries logs
       const logsA = await getSmsLogs({ userId: userA.user.id });
       assert.equal(logsA.logs.length, 1);
       assert.equal(logsA.logs[0].recipient, "9841111111");
 
-      // User B queries logs
       const logsB = await getSmsLogs({ userId: userB.user.id });
       assert.equal(logsB.logs.length, 1);
       assert.equal(logsB.logs[0].recipient, "9842222222");
 
-      // Neither user sees the other user's log
       const userAHasB = logsA.logs.some((l) => l.recipient === "9842222222");
       assert.equal(userAHasB, false);
 
