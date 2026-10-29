@@ -1,0 +1,49 @@
+{
+  "name": "sms-gateway",
+  "version": "1.0.0",
+  "description": "Mini SMS Gateway with provider failover, wallets, BullMQ queue, rate limiting, and signed delivery webhooks",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "test": "node test/run-tests.js",
+    "test:raw": "node --test --test-concurrency=1 test/**/*.test.js",
+    "test:concurrency": "node test/run-tests.js --only-concurrency",
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "queue:worker": "node src/workers/sms.worker.js",
+    "seed": "node prisma/seed.js",
+    "db:setup": "node scripts/apply-schema.js",
+    "db:apply-bonus-migration": "node scripts/apply-migration.js",
+    "wallet:credit": "node scripts/credit-wallet.js",
+    "prisma:validate": "prisma validate",
+    "prisma:generate": "prisma generate"
+  },
+  "keywords": [
+    "sms",
+    "gateway",
+    "express",
+    "prisma",
+    "postgresql",
+    "bullmq"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "bcryptjs": "^3.0.3",
+    "bullmq": "^5.81.5",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14",
+    "prisma": "^7.10.1"
+  }
+}

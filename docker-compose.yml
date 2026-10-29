@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sms_gateway
+      POSTGRES_PASSWORD: sms_gateway_password
+      POSTGRES_DB: sms_gateway
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sms_gateway -d sms_gateway"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_HOST_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: .
+    command: ["sh", "-c", "node scripts/apply-schema.js && node prisma/seed.js"]
+    restart: "no"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://sms_gateway:sms_gateway_password@postgres:5432/sms_gateway?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build: .
+    command: ["node", "src/server.js"]
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://sms_gateway:sms_gateway_password@postgres:5432/sms_gateway?schema=public
+      JWT_SECRET: ${JWT_SECRET:-docker_demo_jwt_secret_change_me_please_32_chars}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
+      WELCOME_CREDITS: ${WELCOME_CREDITS:-10.00}
+      SMS_CREDIT_COST_PER_PART: ${SMS_CREDIT_COST_PER_PART:-1.00}
+      REDIS_URL: redis://redis:6379/0
+      SMS_QUEUE_ENABLED: "true"
+      SMS_QUEUE_NAME: sms-send
+      QUEUE_CONCURRENCY: "5"
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_WINDOW_SECONDS: "60"
+      RATE_LIMIT_MAX_REQUESTS: "60"
+      SMS_WEBHOOK_SECRET: ${SMS_WEBHOOK_SECRET:-docker_demo_webhook_secret_change_me}
+      SMS_WEBHOOK_TOLERANCE_SECONDS: "300"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  worker:
+    build: .
+    command: ["node", "src/workers/sms.worker.js"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://sms_gateway:sms_gateway_password@postgres:5432/sms_gateway?schema=public
+      JWT_SECRET: ${JWT_SECRET:-docker_demo_jwt_secret_change_me_please_32_chars}
+      SMS_CREDIT_COST_PER_PART: ${SMS_CREDIT_COST_PER_PART:-1.00}
+      REDIS_URL: redis://redis:6379/0
+      SMS_QUEUE_ENABLED: "true"
+      SMS_QUEUE_NAME: sms-send
+      QUEUE_CONCURRENCY: "5"
+      QUEUE_ATTEMPTS: "3"
+      QUEUE_BACKOFF_MS: "5000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

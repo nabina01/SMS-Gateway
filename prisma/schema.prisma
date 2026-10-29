@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model credit_wallets {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt   @unique
+  balance    Decimal  @default(0) @db.Decimal(12, 2)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model sms_logs {
+  id                    BigInt                  @id @default(autoincrement())
+  user_id               BigInt
+  recipient             String                  @db.VarChar(16)
+  message               String
+  parts                 Int
+  cost                  Decimal                 @db.Decimal(12, 2)
+  status                String                  @default("pending") @db.VarChar(10)
+  provider_id           BigInt?
+  failure_reason        String?
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
+  sms_providers         sms_providers?          @relation(fields: [provider_id], references: [id], onUpdate: NoAction)
+  users                 users                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sms_provider_attempts sms_provider_attempts[]
+  sms_delivery_reports  sms_delivery_reports?
+
+  @@index([recipient], map: "idx_sms_logs_recipient")
+  @@index([status, created_at(sort: Desc)], map: "idx_sms_logs_status_created")
+  @@index([user_id, created_at(sort: Desc)], map: "idx_sms_logs_user_created")
+}
+
+model sms_provider_attempts {
+  id            BigInt        @id @default(autoincrement())
+  sms_log_id    BigInt
+  provider_id   BigInt
+  status        String        @db.VarChar(10)
+  error_message String?
+  attempted_at  DateTime      @default(now()) @db.Timestamptz(6)
+  sms_providers sms_providers @relation(fields: [provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sms_logs      sms_logs      @relation(fields: [sms_log_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([sms_log_id], map: "idx_sms_provider_attempts_log")
+  @@index([provider_id, attempted_at(sort: Desc)], map: "idx_sms_provider_attempts_provider_time")
+}
+
+model sms_providers {
+  id                    BigInt                  @id @default(autoincrement())
+  name                  String                  @unique @db.VarChar(100)
+  priority              Int                     @unique
+  balance               Decimal                 @default(0) @db.Decimal(14, 2)
+  failure_rate          Decimal                 @default(0) @db.Decimal(4, 3)
+  is_active             Boolean                 @default(true)
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
+  sms_logs              sms_logs[]
+  sms_provider_attempts sms_provider_attempts[]
+  sms_delivery_reports  sms_delivery_reports[]
+}
+
+model users {
+  id             BigInt          @id @default(autoincrement())
+  name           String          @db.VarChar(100)
+  email          String          @unique @db.VarChar(255)
+  password_hash  String
+  created_at     DateTime        @default(now()) @db.Timestamptz(6)
+  credit_wallets credit_wallets?
+  sms_logs       sms_logs[]
+  sms_requests   sms_requests[]
+}
+
+model sms_requests {
+  id                BigInt   @id @default(autoincrement())
+  user_id           BigInt
+  idempotency_key   String   @db.VarChar(200)
+  status            String   @default("processing") @db.VarChar(20)
+  response          Json?
+  last_error        String?
+  total_reserved    Decimal? @db.Decimal(12, 2)
+  total_refunded    Decimal? @db.Decimal(12, 2)
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+  users             users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, idempotency_key], map: "uq_sms_requests_user_key")
+  @@index([status, created_at(sort: Desc)], map: "idx_sms_requests_status_created")
+}
+
+model sms_delivery_reports {
+  id                  BigInt        @id @default(autoincrement())
+  sms_log_id          BigInt        @unique
+  provider_id         BigInt
+  provider_message_id String?       @db.VarChar(200)
+  status              String        @db.VarChar(20)
+  error_message       String?
+  payload             Json?
+  received_at         DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime      @default(now()) @db.Timestamptz(6)
+  sms_logs            sms_logs      @relation(fields: [sms_log_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sms_providers       sms_providers @relation(fields: [provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([provider_id, received_at(sort: Desc)], map: "idx_delivery_provider_time")
+  @@index([status, received_at(sort: Desc)], map: "idx_delivery_status_time")
+}

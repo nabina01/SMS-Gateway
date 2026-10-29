@@ -1,0 +1,339 @@
+{
+  "info": {
+    "name": "SMS Gateway API",
+    "description": "Mini SMS Gateway take-home API collection. Start the app with `npm start` or `docker compose up --build`, then run requests in order. Register/Login stores the JWT automatically.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "token", "value": "" },
+    { "key": "email", "value": "postman.demo@example.com" },
+    { "key": "password", "value": "StrongPassword123!" },
+    { "key": "messageId", "value": "" },
+    { "key": "providerName", "value": "" },
+    { "key": "jobId", "value": "" },
+    { "key": "webhookSecret", "value": "docker_demo_webhook_secret_change_me" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('database is up', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().data.database).to.eql('up');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register (welcome credits)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Demo\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('registered', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.token) pm.collectionVariables.set('token', body.data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('logged in', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.token) pm.collectionVariables.set('token', body.data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "auth", "me"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('profile returned', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Wallet",
+      "item": [
+        {
+          "name": "Get wallet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/wallet", "host": ["{{baseUrl}}"], "path": ["wallet"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('wallet returned', function () { pm.response.to.have.status(200); });",
+                  "pm.test('balance is numeric string', function () {",
+                  "  pm.expect(pm.response.json().data.balance).to.match(/^\\d+\\.\\d{2}$/);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SMS",
+      "item": [
+        {
+          "name": "Send synchronously (idempotent)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "postman-send-{{$timestamp}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": [\"9841234567\", \"+977 9801122334\"],\n  \"message\": \"Hello from the SMS Gateway Postman collection.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/sms/send", "host": ["{{baseUrl}}"], "path": ["sms", "send"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('request accepted', function () {",
+                  "  pm.expect([200, 207, 502]).to.include(pm.response.code);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "const first = body.data && body.data.results && body.data.results[0];",
+                  "if (first) {",
+                  "  pm.collectionVariables.set('messageId', String(first.logId));",
+                  "  if (first.provider && first.provider.name) pm.collectionVariables.set('providerName', first.provider.name);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enqueue asynchronously",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "postman-queue-{{$timestamp}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": [\"9841234567\"],\n  \"message\": \"Queued via BullMQ and Redis.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/sms/queue", "host": ["{{baseUrl}}"], "path": ["sms", "queue"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('queued with 202', function () { pm.response.to.have.status(202); });",
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.jobId) pm.collectionVariables.set('jobId', body.data.jobId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get queue job",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sms/queue/{{jobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["sms", "queue", "{{jobId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('job visible', function () { pm.response.to.have.status(200); });",
+                  "console.log('Job state:', pm.response.json().data.state);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logs (filters + pagination)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sms/logs?page=1&limit=10&status=sent",
+              "host": ["{{baseUrl}}"],
+              "path": ["sms", "logs"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "status", "value": "sent" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('logs returned', function () { pm.response.to.have.status(200); });",
+                  "pm.test('pagination present', function () {",
+                  "  pm.expect(pm.response.json().pagination).to.be.an('object');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Provider health (24h)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/routes/health", "host": ["{{baseUrl}}"], "path": ["routes", "health"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('health returned', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "Signed delivery report",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-sms-timestamp", "value": "{{$timestamp}}" },
+              { "key": "x-sms-signature", "value": "sha256=pending" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageId\": \"{{messageId}}\",\n  \"provider\": \"{{providerName}}\",\n  \"status\": \"delivered\",\n  \"providerMessageId\": \"postman-provider-msg-1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms/delivery",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "sms", "delivery"]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const timestamp = Math.floor(Date.now() / 1000).toString();",
+                  "const rawBody = pm.request.body.raw;",
+                  "const secret = pm.collectionVariables.get('webhookSecret');",
+                  "const signature = CryptoJS.HmacSHA256(timestamp + '.' + rawBody, secret).toString();",
+                  "pm.request.headers.upsert({ key: 'x-sms-timestamp', value: timestamp });",
+                  "pm.request.headers.upsert({ key: 'x-sms-signature', value: 'sha256=' + signature });"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('delivery recorded or duplicate acknowledged', function () {",
+                  "  pm.expect([200, 409]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
