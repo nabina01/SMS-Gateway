@@ -41,10 +41,6 @@ function configuredProviders() {
   });
 }
 
-/**
- * Idempotent seed/upsert for mock providers only. It never creates customers,
- * wallets, logs, or attempts, and it does not reset provider balances.
- */
 export async function seedProviders() {
   const providers = configuredProviders();
   console.log(`Seeding ${providers.length} mock SMS providers...`);

@@ -40,7 +40,6 @@ CREATE TABLE IF NOT EXISTS sms_logs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Record each provider attempt, including failures before failover.
 CREATE TABLE IF NOT EXISTS sms_provider_attempts (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     sms_log_id BIGINT NOT NULL REFERENCES sms_logs(id) ON DELETE CASCADE,
@@ -66,8 +65,6 @@ CREATE INDEX IF NOT EXISTS idx_sms_provider_attempts_provider_time
 CREATE INDEX IF NOT EXISTS idx_sms_provider_attempts_log
     ON sms_provider_attempts (sms_log_id);
 
--- Additive bonus tables (safe to run against an existing database).
--- These tables do not alter the original core tables or their records.
 
 CREATE TABLE IF NOT EXISTS sms_requests (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

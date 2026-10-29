@@ -30,8 +30,6 @@ export function createRedisClient(options = {}) {
     }
   });
   client.on("connect", () => {
-    // Allow short-lived processes (tests, CLI scripts) to exit while the
-    // long-running HTTP server and BullMQ worker keep their own handles alive.
     client.stream?.unref?.();
   });
   return client;

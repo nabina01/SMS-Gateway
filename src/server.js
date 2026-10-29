@@ -12,7 +12,6 @@ import { errorHandler } from "./middleware/error.middleware.js";
 import { getProviderHealthHandler } from "./controllers/sms.controller.js";
 import { closeSmsQueue } from "./services/queue.service.js";
 
-// Enable JSON serialization of BigInt values across all routes.
 BigInt.prototype.toJSON = function toJSON() {
   return this.toString();
 };

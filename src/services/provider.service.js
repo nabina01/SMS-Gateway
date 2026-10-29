@@ -5,11 +5,6 @@ const HEALTH_WINDOW_HOURS = 24;
 const HEALTHY_THRESHOLD = 0.9;
 const DEGRADED_THRESHOLD = 0.7;
 
-/**
- * Fetch all route-eligible providers in ascending priority order.
- * A provider is eligible only when it is active and its balance covers the
- * requested minimum (strictly greater than zero by default).
- */
 export async function getEligibleProviders(minBalance = 0) {
   return prisma.sms_providers.findMany({
     where: {
@@ -20,9 +15,6 @@ export async function getEligibleProviders(minBalance = 0) {
   });
 }
 
-/**
- * Balance lookup through getBalance(providerId).
- */
 export async function getBalance(providerId) {
   const provider = await prisma.sms_providers.findUnique({
     where: { id: BigInt(providerId) },
@@ -52,14 +44,6 @@ export async function getBalance(providerId) {
 
 export const getProviderBalance = getBalance;
 
-/**
- * Simulates an external SMS provider call. No real network request is made.
- *
- * Deterministic test hooks:
- * - options.providerOutcomes[providerName] = "success" | "fail" | "throw"
- * - options.simulatedFailure = boolean (applies to every provider)
- * - options.random = () => number in [0, 1)
- */
 export async function attemptProviderSend(provider, smsLogId, options = {}) {
   const providerKey = provider.name;
   const providerIdKey = provider.id.toString();
@@ -100,13 +84,6 @@ function round(value, places = 2) {
   return Number(Number(value).toFixed(places));
 }
 
-/**
- * Provider health over the trailing 24-hour window.
- *
- * successRate = successful attempts / total attempts, or null when there are
- * no attempts. healthStatus is intentionally "unrated" when no attempts exist:
- * absence of recorded failures is not evidence of health.
- */
 export async function getProvidersHealth() {
   const since = new Date(Date.now() - HEALTH_WINDOW_HOURS * 60 * 60 * 1000);
 

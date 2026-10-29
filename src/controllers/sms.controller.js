@@ -20,9 +20,6 @@ export function sendStatusForResult(result) {
   return 200;
 }
 
-/**
- * Handle POST /sms/send (synchronous by default; supports mode=queue).
- */
 export async function sendSmsHandler(req, res, next) {
   try {
     const { to, message, mode } = req.body || {};
@@ -58,9 +55,6 @@ export async function sendSmsHandler(req, res, next) {
   }
 }
 
-/**
- * Handle POST /sms/queue. Returns 202 with a job id; delivery is not claimed.
- */
 export async function queueSmsHandler(req, res, next) {
   try {
     const userId = req.user?.id;
@@ -135,9 +129,6 @@ export async function getQueueJobHandler(req, res, next) {
   }
 }
 
-/**
- * Handle GET /sms/logs.
- */
 export async function getSmsLogsHandler(req, res, next) {
   try {
     const userId = req.user?.id;
@@ -189,9 +180,6 @@ export async function getSmsLogsHandler(req, res, next) {
   }
 }
 
-/**
- * Handle GET /routes/health.
- */
 export async function getProviderHealthHandler(req, res, next) {
   try {
     const health = await getProvidersHealth();

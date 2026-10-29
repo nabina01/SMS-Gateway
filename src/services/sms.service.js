@@ -142,8 +142,6 @@ async function tryProvider({ log, provider, costPerRecipient, options }) {
 
   try {
     return await prisma.$transaction(async (tx) => {
-      // Debit the provider first, conditionally, so concurrent sends cannot
-      // take a provider below zero.
       const debit = await tx.sms_providers.updateMany({
         where: {
           id: provider.id,
@@ -159,8 +157,6 @@ async function tryProvider({ log, provider, costPerRecipient, options }) {
       if (debit.count !== 1) {
         return { status: "failed", error: "Provider balance is insufficient" };
       }
-
-      // Guard against duplicate processing: only a pending log may become sent.
       const logUpdate = await tx.sms_logs.updateMany({
         where: { id: log.id, status: "pending" },
         data: {
@@ -172,7 +168,6 @@ async function tryProvider({ log, provider, costPerRecipient, options }) {
       });
 
       if (logUpdate.count !== 1) {
-        // Roll back the provider debit; another worker already handled this log.
         throw new Error("SMS_LOG_ALREADY_PROCESSED");
       }
 
@@ -197,8 +192,6 @@ async function tryProvider({ log, provider, costPerRecipient, options }) {
 
 async function refundFailedLog({ logId, userId, costPerRecipient, reason }) {
   return prisma.$transaction(async (tx) => {
-    // The conditional transition is the idempotency guard: only the caller that
-    // moves pending -> failed may issue the refund.
     const updated = await tx.sms_logs.updateMany({
       where: { id: logId, status: "pending" },
       data: {
@@ -366,11 +359,6 @@ async function runIdempotent({ userId, idempotencyKey, operation }) {
   }
 }
 
-/**
- * Send SMS to one or more recipients with atomic credit reservation, priority
- * routing, failover, and exactly-once refunds for recipients that fail on every
- * eligible provider.
- */
 export async function sendSms({ userId, to, message, options = {}, idempotencyKey }) {
   const payload = validateSendPayload(to, message);
 
@@ -455,9 +443,6 @@ function parseFilterDate(value, { endOfDay = false } = {}) {
   return parsed;
 }
 
-/**
- * Fetch paginated SMS logs for a user with optional filters.
- */
 export async function getSmsLogs({
   userId,
   page = 1,

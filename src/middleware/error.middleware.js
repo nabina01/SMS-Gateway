@@ -1,8 +1,3 @@
-/**
- * Centralized error-handling middleware.
- * Formats errors into a consistent JSON response without leaking database
- * credentials, internal file paths, or stack traces.
- */
 export function errorHandler(err, req, res, _next) {
   if (res.headersSent) {
     return;
